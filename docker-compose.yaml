@@ -4,6 +4,7 @@ services:
             context: .
             dockerfile: Dockerfile
         stdin_open: true
+        image: eliza-my
         tty: true
         volumes:
             - /var/run/tappd.sock:/var/run/tappd.sock

@@ -353,6 +353,99 @@ export class DirectClient {
         );
 
         this.app.post(
+            "/:agentId/messageNoAi",
+            upload.single("file"),
+            async (req: express.Request, res: express.Response) => {
+                const agentId = req.params.agentId;
+                const roomId = stringToUuid(
+                    req.body.roomId ?? "default-room-" + agentId
+                );
+                const userId = stringToUuid(req.body.userId ?? "user");
+
+                let runtime = this.agents.get(agentId);
+
+                // if runtime is null, look for runtime with the same name
+                if (!runtime) {
+                    runtime = Array.from(this.agents.values()).find(
+                        (a) =>
+                            a.character.name.toLowerCase() ===
+                            agentId.toLowerCase()
+                    );
+                }
+
+                if (!runtime) {
+                    res.status(404).send("Agent not found");
+                    return;
+                }
+
+                await runtime.ensureConnection(
+                    userId,
+                    roomId,
+                    req.body.userName,
+                    req.body.name,
+                    "direct"
+                );
+
+                const text = req.body.text;
+                // if empty text, directly return
+                if (!text) {
+                    res.json([]);
+                    return;
+                }
+
+                const messageId = stringToUuid(Date.now().toString());
+
+                const attachments: Media[] = [];
+                if (req.file) {
+                    const filePath = path.join(
+                        process.cwd(),
+                        "data",
+                        "uploads",
+                        req.file.filename
+                    );
+                    attachments.push({
+                        id: Date.now().toString(),
+                        url: filePath,
+                        title: req.file.originalname,
+                        source: "direct",
+                        description: `Uploaded file: ${req.file.originalname}`,
+                        text: "",
+                        contentType: req.file.mimetype,
+                    });
+                }
+
+                const content: Content = {
+                    text,
+                    attachments,
+                    source: "direct",
+                    inReplyTo: undefined,
+                };
+
+                const userMessage = {
+                    content,
+                    userId,
+                    roomId,
+                    agentId: runtime.agentId,
+                };
+
+                const memory: Memory = {
+                    id: stringToUuid(messageId + "-" + userId),
+                    ...userMessage,
+                    agentId: runtime.agentId,
+                    userId,
+                    roomId,
+                    content,
+                    createdAt: Date.now(),
+                };
+
+                await runtime.messageManager.addEmbeddingToMemory(memory);
+                await runtime.messageManager.createMemory(memory);
+
+                res.json([]);
+            }
+        );
+
+        this.app.post(
             "/agents/:agentIdOrName/hyperfi/v1",
             async (req: express.Request, res: express.Response) => {
                 // get runtime
