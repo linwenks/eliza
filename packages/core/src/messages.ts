@@ -65,6 +65,7 @@ export const formatMessages = ({
     actors: Actor[];
 }) => {
     const messageStrings = messages
+        .slice(0, 2)
         .reverse()
         .filter((message: Memory) => message.userId)
         .map((message: Memory) => {
